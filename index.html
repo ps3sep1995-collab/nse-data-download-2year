@@ -52,4 +52,204 @@
         <!-- Full Interactive Table Card -->
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-lg overflow-hidden">
             <table id="fullDataTable" class="w-full text-slate-300 display stripe">
+                <thead class="bg-slate-700/50 text-[10px] uppercase text-slate-400">
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Date</th>
+                        <th>Ratio %</th>
+                        <th>Change %</th>
+                    </tr>
+                </thead>
+                <tbody id="fullDataBody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let dataTableInstance = null;
+
+        // तारीख में दिन जो/घटाने के लिए हेल्पर्स
+        function addDays(date, days) {
+            const result = new Date(date);
+            result.setDate(result.getDate() + days);
+            return result;
+        }
+
+        function formatDateYYYYMMDD(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}${m}${d}`;
+        }
+
+        async function loadBhavcopyData(dateStr) {
+            const targetDate = new Date(dateStr);
+            const targetClean = formatDateYYYYMMDD(targetDate);
+            
+            // पिछले 5 दिनों की तारीखों की लिस्ट तैयार करें (चूँकि बीच में वीकेंड हो सकते हैं, हम पीछे की 7-8 तारीखों को चेक करेंगे ताकि 5 valid trading days मिल सकें)
+            const dateList = [];
+            let curr = new Date(targetDate);
+            while (dateList.length < 5 && (targetDate - curr) / (1000 * 60 * 60 * 24) < 15) {
+                dateList.push(formatDateYYYYMMDD(curr));
+                curr.setDate(curr.getDate() - 1);
+            }
+
+            try {
+                // सभी 5 दिनों की CSV फाइलों को एक साथ फेच करें
+                const fetchPromises = dateList.map(async (dt) => {
+                    try {
+                        const res = await fetch(`nse_bhavcopies/sec_bhavdata_${dt}.csv`);
+                        if (!res.ok) return null;
+                        const text = await res.text();
+                        return { date: dt, text: text };
+                    } catch (e) {
+                        return null;
+                    }
+                });
+
+                const results = await Promise.all(fetchPromises);
+                const validFiles = results.filter(item => item !== null);
+
+                if (validFiles.length === 0) {
+                    throw new Error("No files found");
+                }
+
+                processMultiDayData(validFiles, targetClean, dateStr);
+
+            } catch (error) {
+                console.warn("Error loading files:", error);
+                renderEmptyTable(dateStr);
+            }
+        }
+
+        function processMultiDayData(files, targetClean, dateStr) {
+            // हर सिंबल के लिए पिछले दिनों की Delivery Qty स्टोर करने का मैप
+            const stockHistory = {};
+
+            files.forEach(fileObj => {
+                const lines = fileObj.text.split('\n');
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    const row = line.split(',').map(item => item.trim().replace(/^"|"$/g, ''));
+                    
+                    if (row.length > 12) {
+                        const symbol = row[0];
+                        const series = row[1];
+                        if (series === 'EQ') {
+                            const delivQty = parseFloat(row[12]) || 0; // DELIV_QTY कॉलम 12 पर है
+                            const changePct = parseFloat(row[8]) || 0;
+
+                            if (!stockHistory[symbol]) {
+                                stockHistory[symbol] = { deliveries: [], changePct: changePct };
+                            }
+                            // तारीख के हिसाब से स्टोर करें
+                            stockHistory[symbol].deliveries.push({ date: fileObj.date, qty: delivQty, change: changePct });
+                        }
+                    }
+                }
+            });
+
+            const parsedData = [];
+
+            // मुख्य तारीख (Target Date) का डेटा आधार मानकर रेश्यो कैलकुलेट करें
+            Object.keys(stockHistory).forEach(symbol => {
+                const item = stockHistory[symbol];
+                // टारगेट डेट का डेटा ढूंढें
+                const targetRecord = item.deliveries.find(d => d.date === targetClean);
                 
+                if (targetRecord) {
+                    const todayQty = targetRecord.qty;
+                    // पिछले दिनों की डिलीवरी Qty (टारगेट को छोड़कर या मिलाकर 5-day average)
+                    const pastQtys = item.deliveries.map(d => d.qty);
+                    
+                    if (pastQtys.length > 0) {
+                        const sum = pastQtys.reduce((a, b) => a + b, 0);
+                        const avg5d = sum / pastQtys.length; // 5-day average delivery qty
+
+                        const ratio = avg5d > 0 ? ((todayQty / avg5d) * 100).toFixed(1) : 0;
+
+                        parsedData.push({
+                            symbol: symbol,
+                            date: dateStr,
+                            ratio: parseFloat(ratio),
+                            changePct: targetRecord.change
+                        });
+                    }
+                }
+            });
+
+            renderTable(parsedData);
+        }
+
+        function renderEmptyTable(dateStr) {
+            if (dataTableInstance) {
+                dataTableInstance.destroy();
+            }
+            const fullBody = document.getElementById('fullDataBody');
+            fullBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">इस तारीख (${dateStr}) के लिए पर्याप्त डेटा उपलब्ध नहीं है।</td></tr>`;
+            dataTableInstance = $('#fullDataTable').DataTable({ paging: false, searching: false, info: false });
+        }
+
+        function renderTable(processed) {
+            processed.sort((a, b) => b.ratio - a.ratio);
+
+            if (dataTableInstance) {
+                dataTableInstance.destroy();
+            }
+
+            const fullBody = document.getElementById('fullDataBody');
+            fullBody.innerHTML = "";
+            
+            if (processed.length === 0) {
+                fullBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">कोई डेटा नहीं मिला।</td></tr>`;
+            } else {
+                processed.forEach(item => {
+                    const changeColor = item.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400';
+                    const changeSign = item.changePct >= 0 ? '+' : '';
+                    fullBody.innerHTML += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                        <td class="font-semibold text-white">${item.symbol}</td>
+                        <td class="text-slate-300">${item.date}</td>
+                        <td class="font-bold text-cyan-400">${item.ratio}%</td>
+                        <td class="font-bold ${changeColor}">${changeSign}${item.changePct}%</td>
+                    </tr>`;
+                });
+            }
+
+            dataTableInstance = $('#fullDataTable').DataTable({
+                paging: false,
+                searching: false,
+                info: false,
+                order: [[2, "desc"]]
+            });
+        }
+
+        // डिफ़ॉल्ट तारीख 10 अक्टूबर 2024 सेट की गई है[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span)
+        const defaultDateStr = "2024-10-10";
+        document.getElementById('bhav-date').value = defaultDateStr;
+        loadBhavcopyData(defaultDateStr);
+
+        document.getElementById('load-date-btn').addEventListener('click', function() {
+            const selectedDate = document.getElementById('bhav-date').value;
+            if (selectedDate) {
+                loadBhavcopyData(selectedDate);
+            }
+        });
+
+        document.getElementById('search-stock-btn').addEventListener('click', function() {
+            const query = document.getElementById('stock-search-input').value.trim();
+            if (dataTableInstance) {
+                dataTableInstance.search(query).draw();
+            }
+        });
+
+        document.getElementById('stock-search-input').addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                document.getElementById('search-stock-btn').click();
+            }
+        });
+    </script>
+</body>
+</html>
