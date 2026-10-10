@@ -70,22 +70,17 @@
                 if (!res.ok) throw new Error("JSON file not found");
                 globalData = await res.json();
                 
-                // JSON में मौजूद सभी तारीखों को सॉर्ट करें ताकि सबसे नई (latest) तारीख मिल सके
                 let availableDates = Object.keys(globalData).sort();
                 
                 if (availableDates.length > 0) {
-                    let latestDate = availableDates[availableDates.length - 1]; // सबसे आखिरी/नवीनतम तारीख
-                    
-                    // Date picker में भी वही लेटेस्ट तारीख सेट करें
+                    let latestDate = availableDates[availableDates.length - 1];
                     document.getElementById('bhav-date').value = latestDate;
-                    
-                    // टेबल में डेटा रेंडर करें
                     renderTableForDate(latestDate);
                 } else {
-                    renderMessage("डेटा उपलब्ध नहीं है।");
+                    renderMessage("JSON फाइल खाली है।");
                 }
             } catch (e) {
-                renderMessage("कृपया पहले backtest.py रन करके JSON फाइल जनरेट करें।");
+                renderMessage("error: dashboard_data.json लोड नहीं हो पा रही है।");
             }
         }
 
@@ -102,7 +97,6 @@
             if (rows.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">तारीख ${dateStr} के लिए कोई डेटा उपलब्ध नहीं है।</td></tr>`;
             } else {
-                // Ratio % के हिसाब से डिसेंडिंग सॉर्ट करें
                 rows.sort((a, b) => b.ratioPct - a.ratioPct);
 
                 rows.forEach(r => {
@@ -130,7 +124,7 @@
                 $('#deliveryTable').DataTable().clear().destroy();
             }
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">${msg};
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
         }
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -143,7 +137,7 @@
                 if (globalData[dt]) {
                     renderTableForDate(dt);
                 } else {
-                    renderMessage(`तारीख ${dt} के लिए कोई डेटा नहीं मिला (यह शेयर बाजार की छुट्टी हो सकती है)।`);
+                    renderMessage(`तारीख ${dt} के लिए कोई डेटा नहीं मिला (बाजार बंद हो सकता है)।`);
                 }
             }
         });
