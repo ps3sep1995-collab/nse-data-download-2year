@@ -24,7 +24,7 @@ def download_and_clean_nse_data():
 
     # पिछले 2 साल (730 दिन) की अवधि सेट की गई है
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=730)
+    start_date = end_date - timedelta(days=10)
     
     current_date = start_date
     os.makedirs("nse_bhavcopies", exist_ok=True)
