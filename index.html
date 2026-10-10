@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NSE F&O 5-Day Delivery Ratio Dashboard</title>
+    <title>NSE F&O 5-Day Delivery Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- DataTables CSS & JS -->
@@ -110,9 +110,10 @@
                     `;
                 });
 
+                // searching: false कर दिया गया है ताकि DataTables का खुद का सर्च बॉक्स न आए
                 tableInstance = $('#deliveryTable').DataTable({
                     paging: false,
-                    searching: true,
+                    searching: false, 
                     info: false,
                     order: [[3, "desc"]]
                 });
@@ -142,9 +143,10 @@
             }
         });
 
+        // हमारे कस्टम सर्च बार को DataTables से जोड़ना
         $('#stock-search').on('keyup', function() {
-            if ($.fn.DataTable.isDataTable('#deliveryTable')) {
-                $('#deliveryTable').search(this.value).draw();
+            if (tableInstance) {
+                tableInstance.columns(0).search(this.value).draw();
             }
         });
     </script>
