@@ -27,10 +27,13 @@ jobs:
     - name: Run Downloader Script
       run: python nse_to_amibroker.py
 
+    - name: Run Backtest Script to Update Dashboard JSON
+      run: python backtest.py
+
     - name: Commit and push changes back to repo
       uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_message: "Auto-update NSE Bhavcopy CSVs (Including weekends)"
+        commit_message: "Auto-update NSE Bhavcopies and Dashboard JSON"
         branch: main
         create_branch_for_ci_updates: false
     permissions:
