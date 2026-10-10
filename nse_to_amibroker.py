@@ -22,21 +22,21 @@ def download_and_clean_nse_data():
         print("NSE Connection Init Error:", e)
         return
 
-    # पिछले 2 साल (730 दिन) की अवधि सेट की गई है
+    # पिछले 2 साल (730 दिन) की अवधि - आज से शुरू होकर पीछे जाएगी
     end_date = datetime.now()
     start_date = end_date - timedelta(days=30)
     
-    current_date = start_date
+    current_date = end_date  # शुरुआत आज (नवीनतम तारीख) से होगी
     os.makedirs("nse_bhavcopies", exist_ok=True)
 
-    print(f"डेटा डाउनलोड शुरू हो रहा है: {start_date.strftime('%Y-%m-%d')} से {end_date.strftime('%Y-%m-%d')} तक...\n")
+    print(f"डेटा डाउनलोड शुरू हो रहा है: {end_date.strftime('%Y-%m-%d')} से पीछे की तरफ...\n")
 
     seen_hashes = {}
     downloaded_count = 0
     duplicate_count = 0
 
-    # डेटा डाउनलोड और ऑन-द-फ्लाई डुप्लीकेट फिल्ट्रेशन
-    while current_date <= end_date:
+    # डेटा डाउनलोड और ऑन-द-फ्लाई डुप्लीकेट फिल्ट्रेशन (उल्टा लूप: आज से 2 साल पीछे)
+    while current_date >= start_date:
         date_str_nse = current_date.strftime("%d%m%Y") # NSE URL के लिए DDMMYYYY
         date_str_file = current_date.strftime("%Y%m%d") # फाइल सेव करने के लिए YYYYMMDD
         
@@ -54,7 +54,6 @@ def download_and_clean_nse_data():
                     
                     # चेक करें कि क्या यह डेटा पहले आ चुका है (हॉलिडे पर पुरानी फाइल देना)
                     if file_hash in seen_hashes:
-                        print(f"डुप्लीकेट हटाई गई (स्किल): {date_str_file} (मूल फाइल: {seen_hashes[file_hash]})")
                         duplicate_count += 1
                     else:
                         # अगर यूनीक है, तभी फोल्डर में सेव करें
@@ -68,7 +67,7 @@ def download_and_clean_nse_data():
             
             time.sleep(1.2)
         else:
-            # अगर फाइल पहले से ही लोकल/रिपॉजिटरी में है, तो उसका भी हैश याद रखang ताकि आगे डुप्लीकेट न हो
+            # अगर फाइल पहले से ही मौजूद है, तो उसका भी हैश याद रखें ताकि आगे डुप्लीकेट न हो
             try:
                 with open(file_path, 'rb') as f:
                     file_hash = hashlib.md5(f.read()).hexdigest()
@@ -76,12 +75,12 @@ def download_and_clean_nse_data():
             except:
                 pass
 
-        current_date += timedelta(days=1)
+        current_date -= timedelta(days=1)  # एक-एक दिन पीछे जाना
 
     print(f"\nप्रक्रिया पूरी हुई!")
     print(f"कुल नई फाइलें सेव हुईं: {downloaded_count}")
     print(f"कुल डुप्लीकेट फाइलें रोकी गईं: {duplicate_count}")
-    print("अब 'nse_bhavcopies' फोल्डर में पूरी तरह शुद्ध, साफ़ और सही क्रम में डेटा मौजूद है।")
+    print("अब 'nse_bhavcopies' फोल्डर में पूरी तरह शुद्ध, साफ़ और सही क्रम (नवीनतम फाइलें सबसे ऊपर) में डेटा मौजूद है।")
 
 if __name__ == "__main__":
     download_and_clean_nse_data()
