@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NSE F&O Delivery Volume Dashboard</title>
+    <title>NSE F&O 5-Day Delivery Ratio Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- DataTables CSS & JS -->
@@ -13,9 +13,10 @@
     <style>
         table.dataTable { width: 100% !important; margin: 0 !important; table-layout: fixed; }
         th, td { padding: 8px 6px !important; font-size: 11px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        th:nth-child(1), td:nth-child(1) { width: 35%; text-align: left; }
-        th:nth-child(2), td:nth-child(2) { width: 30%; text-align: right; }
-        th:nth-child(3), td:nth-child(3) { width: 35%; text-align: right; }
+        th:nth-child(1), td:nth-child(1) { width: 30%; text-align: left; }
+        th:nth-child(2), td:nth-child(2) { width: 25%; text-align: right; }
+        th:nth-child(3), td:nth-child(3) { width: 25%; text-align: right; }
+        th:nth-child(4), td:nth-child(4) { width: 20%; text-align: right; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans leading-relaxed">
@@ -24,8 +25,8 @@
         <!-- Header & Date Picker -->
         <header class="mb-3 border-b border-slate-800 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
-                <h1 class="text-sm font-bold tracking-tight text-emerald-400">NSE F&O Delivery Dashboard</h1>
-                <p class="text-slate-400 text-[10px]">F&O Stocks Delivery Volume Matrix</p>
+                <h1 class="text-sm font-bold tracking-tight text-emerald-400">NSE F&O 5-Day Delivery Ratio Dashboard</h1>
+                <p class="text-slate-400 text-[10px]">Delivery Qty vs 5-Day Average Ratio (%)</p>
             </div>
             
             <div class="flex items-center gap-1.5 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 shadow w-full sm:w-auto">
@@ -47,7 +48,8 @@
                     <tr>
                         <th class="text-left">Symbol</th>
                         <th class="text-right">Deliv Qty</th>
-                        <th class="text-right">% to Traded Qty</th>
+                        <th class="text-right">5D Avg Qty</th>
+                        <th class="text-right">Ratio %</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -61,7 +63,6 @@
         let tableInstance = null;
         let foSymbols = new Set();
 
-        // 1. fo_symbols.txt लोड करें
         async function loadFoSymbols() {
             try {
                 const res = await fetch('fo_symbols.txt');
@@ -77,106 +78,169 @@
             }
         }
 
-        // 2. चुनी गई तारीख की Bhavcopy CSV फाइल लोड करें
-        async function loadDataForDate(dateStr) {
-            const cleanDate = dateStr.replace(/-/g, '');
-            const csvPath = `nse_bhavcopies/sec_bhavdata_${cleanDate}.csv`;
-
-            try {
-                const res = await fetch(csvPath);
-                if (!res.ok) throw new Error("File not found");
-                const csvText = await res.text();
-                parseAndRender(csvText, dateStr);
-            } catch (err) {
-                renderMessage(`तारीख ${dateStr} के लिए कोई डेटा उपलब्ध नहीं है।`);
+        // तारीख से पिछले N ट्रेडिंग दिन जनरेट करने का फंक्शन (हफ्ते के दिन छोड़कर पीछे जाना)
+        function getPreviousTradingDates(startDateStr, count) {
+            let dates = [];
+            let curr = new Date(startDateStr);
+            
+            while (dates.length < count) {
+                // वीकेंड (शनिवार/रविवार) छोड़ दें
+                let dayOfWeek = curr.getDay();
+                if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+                    let yyyy = curr.getFullYear();
+                    let mm = String(curr.getMonth() + 1).padStart(2, '0');
+                    let dd = String(curr.getDate()).padStart(2, '0');
+                    dates.push(`${yyyy}${mm}${dd}`);
+                }
+                curr.setDate(curr.getDate() - 1);
             }
+            return dates; // [TargetDate, Day-1, Day-2, Day-3, Day-4]
         }
 
-        // 3. CSV पार्स करके F&O स्टॉक्स दिखाना
-        function parseAndRender(csvText, dateStr) {
-            const lines = csvText.split('\n');
+        async function loadDataForDate(dateStr) {
+            const targetCleanDate = dateStr.replace(/-/g, '');
+            // कुल 5 दिन चाहिए मूविंग एवरेज के लिए (जैसे आज + पिछले 4 दिन)
+            const dateList = getPreviousTradingDates(dateStr, 5);
+            
+            renderMessage("डेटा लोड हो रहा है...");
+
+            let symbolHistMap = {}; // { SYMBOL: [qty_day0, qty_day1, qty_day2, qty_day3, qty_day4] }
+            let targetDayRows = {};
+
+            // एक-एक करके सभी 5 दिनों की फाइलें फेच करें
+            for (let i = 0; i < dateList.length; i++) {
+                let dStr = dateList[i];
+                let csvPath = `nse_bhavcopies/sec_bhavdata_${dStr}.csv`;
+
+                try {
+                    let res = await fetch(csvPath);
+                    if (!res.ok) continue; // अगर कोई पुरानी छुट्टी की फाइल न मिले तो स्किप करें
+                    let csvText = await res.text();
+                    let lines = csvText.split('\n');
+                    if (lines.length < 2) continue;
+
+                    let headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toUpperCase());
+                    let symIdx = headers.indexOf('SYMBOL');
+                    let seriesIdx = headers.indexOf('SERIES');
+                    let delivQtyIdx = headers.indexOf('DELIV_QTY');
+
+                    if (symIdx === -1 || delivQtyIdx === -1) continue;
+
+                    for (let j = 1; j < lines.length; j++) {
+                        let line = lines[j].trim();
+                        if (!line) continue;
+                        let cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                        if (cols.length > Math.max(symIdx, delivQtyIdx)) {
+                            let symbol = cols[symIdx];
+                            let series = seriesIdx !== -1 ? cols[seriesIdx] : 'EQ';
+
+                            if (series === 'EQ' && (foSymbols.size === 0 || foSymbols.has(symbol))) {
+                                let delivQty = parseFloat(cols[delivQtyIdx]) || 0;
+
+                                if (!symbolHistMap[symbol]) {
+                                    symbolHistMap[symbol] = [];
+                                }
+                                symbolHistMap[symbol][i] = delivQty;
+
+                                // अगर यह मुख्य टारगेट तारीख है (index 0)
+                                if (i === 0) {
+                                    targetDayRows[symbol] = delivQty;
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // फाइल न मिलने पर आगे बढ़ें
+                }
+            }
+
+            processAndRenderResults(targetDayRows, symbolHistMap);
+        }
+
+        function processAndRenderResults(targetDayRows, symbolHistMap) {
             const rows = [];
 
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
+            for (let symbol in targetDayRows) {
+                let todayQty = targetDayRows[symbol];
+                let history = symbolHistMap[symbol] || [];
+
+                // पिछले 5 दिनों का डेटा चेक करें (index 0 आज है, 1 से 4 पिछले दिन हैं)
+                // अगर पिछले दिनों का डेटा मौजूद है तो एवरेज निकालें
+                let pastDays = history.slice(1, 5).filter(q => q !== undefined && q > 0);
                 
-                const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-                if (cols.length > 13) {
-                    const symbol = cols[0];
-                    const series = cols[1];
+                if (pastDays.length >= 2) { // कम से कम 2 दिन का डेटा होना चाहिए एवरेज के लिए
+                    let sum = pastDays.reduce((a, b) => a + b, 0);
+                    let avg5 = sum / pastDays.length;
 
-                    // केवल F&O लिस्ट वाले और EQ सीरीज के शेयर लें
-                    if (series === 'EQ' && (foSymbols.size === 0 || foSymbols.has(symbol))) {
-                        const delivQty = parseFloat(cols[12]) || 0;
-                        const delivPct = parseFloat(cols[13]) || 0;
-
+                    if (avg5 > 0) {
+                        let ratioPct = (todayQty / avg5) * 100;
                         rows.push({
                             symbol: symbol,
-                            delivQty: delivQty,
-                            delivPct: delivPct
+                            delivQty: todayQty,
+                            avg5Qty: Math.round(avg5),
+                            ratioPct: ratioPct
                         });
                     }
                 }
             }
 
-            // डिलीवरी प्रतिशत के हिसाब से डिसेंडिंग सॉर्ट करें
-            rows.sort((a, b) => b.delivPct - a.delivPct);
+            // Ratio % के हिसाब से डिसेंडिंग सॉर्ट करें (सबसे ज्यादा रेश्यो ऊपर)
+            rows.sort((a, b) => b.ratioPct - a.ratioPct);
 
-            if (tableInstance) {
-                tableInstance.destroy();
+            if ($.fn.DataTable.isDataTable('#deliveryTable')) {
+                $('#deliveryTable').DataTable().clear().destroy();
             }
 
             const tbody = document.getElementById('tableBody');
             tbody.innerHTML = "";
 
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400">इस दिन कोई F&O डेटा नहीं मिला।</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">पर्याप्त ऐतिहासिक डेटा उपलब्ध नहीं है।</td></tr>`;
             } else {
                 rows.forEach(r => {
                     tbody.innerHTML += `
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
                             <td class="font-semibold text-white">${r.symbol}</td>
                             <td class="text-right text-slate-300">${r.delivQty.toLocaleString('en-IN')}</td>
-                            <td class="text-right font-bold text-cyan-400">${r.delivPct.toFixed(2)}%</td>
+                            <td class="text-right text-slate-400">${r.avg5Qty.toLocaleString('en-IN')}</td>
+                            <td class="text-right font-bold text-cyan-400">${r.ratioPct.toFixed(2)}%</td>
                         </tr>
                     `;
                 });
-            }
 
-            tableInstance = $('#deliveryTable').DataTable({
-                paging: false,
-                searching: true,
-                info: false,
-                order: [[2, "desc"]]
-            });
-            
-            // कस्टम सर्च इनपुट को DataTables से जोड़ें
-            $('#stock-search').on('keyup', function() {
-                tableInstance.search(this.value).draw();
-            });
+                tableInstance = $('#deliveryTable').DataTable({
+                    paging: false,
+                    searching: true,
+                    info: false,
+                    order: [[3, "desc"]]
+                });
+            }
         }
 
         function renderMessage(msg) {
-            if (tableInstance) tableInstance.destroy();
+            if ($.fn.DataTable.isDataTable('#deliveryTable')) {
+                $('#deliveryTable').DataTable().clear().destroy();
+            }
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
-            tableInstance = $('#deliveryTable').DataTable({ paging: false, searching: false, info: false });
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
         }
 
-        // पेज लोड पर इनिशियलाइज़ेशन
         window.addEventListener('DOMContentLoaded', async () => {
             await loadFoSymbols();
-            
-            // डिफ़ॉल्ट रूप से आज की या हालिया तारीख सेट करें
             const today = new Date().toISOString().split('T')[0];
-            document.getElementById('bhav-date').value = "2024-10-10"; // आपकी उपलब्ध तारीख के अनुसार
+            document.getElementById('bhav-date').value = "2024-10-10"; // अपनी उपलब्ध तारीख सेट करें
             loadDataForDate(document.getElementById('bhav-date').value);
         });
 
         document.getElementById('load-btn').addEventListener('click', () => {
             const dt = document.getElementById('bhav-date').value;
             if (dt) loadDataForDate(dt);
+        });
+
+        $('#stock-search').on('keyup', function() {
+            if ($.fn.DataTable.isDataTable('#deliveryTable')) {
+                $('#deliveryTable').search(this.value).draw();
+            }
         });
     </script>
 </body>
