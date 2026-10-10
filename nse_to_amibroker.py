@@ -32,31 +32,31 @@ def download_and_clean_nse_data():
 
     # पिछले 2 साल (730 दिन) की अवधि सेट की गई है
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=30)
+    start_date = end_date - timedelta(days=50)
     
     current_date = start_date
     os.makedirs("nse_bhavcopies", exist_ok=True)
 
     print(f"डेटा डाउनलोड शुरू हो रहा है: {start_date.strftime('%Y-%m-%d')} से {end_date.strftime('%Y-%m-%d')} तक...\n")
 
-    # 1. डेटा डाउनलोड करने की प्रक्रिया (सातों दिन चेक करेगा ताकि शनिवार/रविवार के स्पेशल सेशन न छूटें)
+    # 1. डेटा डाउनलोड करने की प्रक्रिया
     while current_date <= end_date:
-        date_str = current_date.strftime("%d%m%Y")
-        url = f"https://archives.nseindia.com/products/content/sec_bhavdata_full_{date_str}.csv"
-        file_path = f"nse_bhavcopies/sec_bhavdata_{date_str}.csv"
+        date_str_nse = current_date.strftime("%d%m%Y") # NSE के URL के लिए DDMMYYYY format
+        date_str_file = current_date.strftime("%Y%m%d") # फाइल सेव करने के लिए YYYYMMDD format
+        
+        url = f"https://archives.nseindia.com/products/content/sec_bhavdata_full_{date_str_nse}.csv"
+        file_path = f"nse_bhavcopies/sec_bhavdata_{date_str_file}.csv"
         
         if not os.path.exists(file_path):
             try:
                 response = session.get(url, timeout=10)
-                # यदि फाइल सफलतापूर्वक मिल जाती है और उसका आकार सही है
                 if response.status_code == 200 and len(response.content) > 1000:
                     with open(file_path, 'wb') as f:
                         f.write(response.content)
-                    print(f"सफलतापूर्वक डाउनलोड हुआ: {date_str}")
+                    print(f"सफलतापूर्वक डाउनलोड हुआ: {date_str_file}")
             except Exception as ex:
                 pass
             
-            # एनएसई सर्वर पर लोड न पड़े इसलिए थोड़ा अंतराल रखें
             time.sleep(1.2)
         
         current_date += timedelta(days=1)
@@ -73,17 +73,16 @@ def download_and_clean_nse_data():
             try:
                 file_hash = get_file_hash(f_path)
                 if file_hash in seen_hashes:
-                    # अगर यह फाइल किसी पिछली तारीख की फाइल जैसी ही है (यानी हॉलिडे पर पुरानी कॉपी दी गई है)
                     os.remove(f_path)
                     print(f"डुप्लीकेट हटाई गई: {filename} (मूल फाइल: {seen_hashes[file_hash]})")
                     removed_count += 1
                 else:
                     seen_hashes[file_hash] = filename
             except Exception as e:
-                print(f"ফाइल प्रोसेस करने में त्रुटि {filename}: {e}")
+                print(f"फाइल प्रोसेस करने में त्रुटि {filename}: {e}")
 
     print(f"\nप्रक्रिया पूरी हुई! कुल {removed_count} डुप्लीकेट फाइलें हटा दी गई हैं।")
-    print("अब शुद्ध और साफ़ डेटा 'nse_bhavcopies' फोल्डर में उपलब्ध है, जिसे एमीब्रोकर में इम्पोर्ट किया जा सकता है।")
+    print("अब शुद्ध और साफ़ डेटा 'nse_bhavcopies' फोल्डर में YYYYMMDD फॉर्मेट में उपलब्ध है।")
 
 if __name__ == "__main__":
     download_and_clean_nse_data()
