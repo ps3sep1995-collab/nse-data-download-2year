@@ -3,252 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NSE F&O Delivery Volume % Dashboard</title>
+    <title>NSE F&O Delivery Volume Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- DataTables -->
+    <!-- DataTables CSS & JS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <style>
         table.dataTable { width: 100% !important; margin: 0 !important; table-layout: fixed; }
-        th, td { padding: 8px 4px !important; font-size: 11px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-        th:nth-child(1), td:nth-child(1) { width: 30%; }
-        th:nth-child(2), td:nth-child(2) { width: 25%; }
-        th:nth-child(3), td:nth-child(3) { width: 22%; }
-        th:nth-child(4), td:nth-child(4) { width: 23%; }
+        th, td { padding: 8px 6px !important; font-size: 11px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        th:nth-child(1), td:nth-child(1) { width: 35%; text-align: left; }
+        th:nth-child(2), td:nth-child(2) { width: 30%; text-align: right; }
+        th:nth-child(3), td:nth-child(3) { width: 35%; text-align: right; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans leading-relaxed">
 
-    <div class="max-w-7xl mx-auto px-2 py-3">
-        <!-- Header & Controls: Date Picker + Quick Stock Search -->
-        <header class="mb-3 border-b border-slate-800 pb-2">
-            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
-                <div>
-                    <h1 class="text-base font-bold tracking-tight text-emerald-400">NSE F&O Delivery Analyzer</h1>
-                    <p class="text-slate-400 text-[10px]">Delivery Percentage & Volume Matrix</p>
-                </div>
-                
-                <!-- Controls Group -->
-                <div class="flex flex-wrap items-center gap-1.5 w-full lg:w-auto">
-                    <!-- Date Picker -->
-                    <div class="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 shadow flex-1 lg:flex-none">
-                        <label for="bhav-date" class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Date:</label>
-                        <input type="date" id="bhav-date" class="bg-slate-900 text-emerald-400 text-xs px-1 py-0.5 rounded border border-slate-600 focus:outline-none font-semibold w-full">
-                        <button id="load-date-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">Load</button>
-                    </div>
-
-                    <!-- Stock Symbol Direct Search Bar -->
-                    <div class="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 shadow flex-1 lg:flex-none">
-                        <label for="stock-search-input" class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Stock:</label>
-                        <input type="text" id="stock-search-input" placeholder="RELIANCE" class="bg-slate-900 text-cyan-400 text-xs px-1 py-0.5 rounded border border-slate-600 focus:outline-none w-full uppercase font-semibold">
-                        <button id="search-stock-btn" class="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">Search</button>
-                    </div>
-                </div>
+    <div class="max-w-4xl mx-auto px-2 py-3">
+        <!-- Header & Date Picker -->
+        <header class="mb-3 border-b border-slate-800 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+                <h1 class="text-sm font-bold tracking-tight text-emerald-400">NSE F&O Delivery Dashboard</h1>
+                <p class="text-slate-400 text-[10px]">F&O Stocks Delivery Volume Matrix</p>
+            </div>
+            
+            <div class="flex items-center gap-1.5 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 shadow w-full sm:w-auto">
+                <label for="bhav-date" class="text-[10px] uppercase tracking-wider text-slate-400 font-medium">Date:</label>
+                <input type="date" id="bhav-date" class="bg-slate-900 text-emerald-400 text-xs px-1.5 py-0.5 rounded border border-slate-600 focus:outline-none font-semibold flex-1 sm:flex-none">
+                <button id="load-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded shadow">Load</button>
             </div>
         </header>
 
-        <!-- Full Interactive Table Card -->
+        <!-- Search Bar -->
+        <div class="mb-2">
+            <input type="text" id="stock-search" placeholder="Search Symbol (e.g. RELIANCE)..." class="w-full bg-slate-800 text-slate-200 text-xs px-2.5 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-emerald-500 uppercase font-semibold placeholder:normal-case placeholder:text-slate-500 shadow">
+        </div>
+
+        <!-- Data Table Card -->
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-2 shadow-lg overflow-hidden">
-            <table id="fullDataTable" class="w-full text-slate-300 display stripe">
+            <table id="deliveryTable" class="w-full text-slate-300 display stripe">
                 <thead class="bg-slate-700/50 text-[10px] uppercase text-slate-400">
                     <tr>
-                        <th>Symbol</th>
-                        <th>Date</th>
-                        <th>Ratio %</th>
-                        <th>Change %</th>
+                        <th class="text-left">Symbol</th>
+                        <th class="text-right">Deliv Qty</th>
+                        <th class="text-right">% to Traded Qty</th>
                     </tr>
                 </thead>
-                <tbody id="fullDataBody">
-                    <!-- Populated dynamically -->
+                <tbody id="tableBody">
+                    <!-- Data loaded dynamically -->
                 </tbody>
             </table>
         </div>
     </div>
 
     <script>
-        let dataTableInstance = null;
+        let tableInstance = null;
+        let foSymbols = new Set();
 
-        // तारीख में दिन जो/घटाने के लिए हेल्पर्स
-        function addDays(date, days) {
-            const result = new Date(date);
-            result.setDate(result.getDate() + days);
-            return result;
-        }
-
-        function formatDateYYYYMMDD(date) {
-            const y = date.getFullYear();
-            const m = String(date.getMonth() + 1).padStart(2, '0');
-            const d = String(date.getDate()).padStart(2, '0');
-            return `${y}${m}${d}`;
-        }
-
-        async function loadBhavcopyData(dateStr) {
-            const targetDate = new Date(dateStr);
-            const targetClean = formatDateYYYYMMDD(targetDate);
-            
-            // पिछले 5 दिनों की तारीखों की लिस्ट तैयार करें (चूँकि बीच में वीकेंड हो सकते हैं, हम पीछे की 7-8 तारीखों को चेक करेंगे ताकि 5 valid trading days मिल सकें)
-            const dateList = [];
-            let curr = new Date(targetDate);
-            while (dateList.length < 5 && (targetDate - curr) / (1000 * 60 * 60 * 24) < 15) {
-                dateList.push(formatDateYYYYMMDD(curr));
-                curr.setDate(curr.getDate() - 1);
+        // 1. fo_symbols.txt लोड करें
+        async function loadFoSymbols() {
+            try {
+                const res = await fetch('fo_symbols.txt');
+                if (res.ok) {
+                    const text = await res.text();
+                    text.split('\n').forEach(s => {
+                        const sym = s.trim().toUpperCase();
+                        if (sym) foSymbols.add(sym);
+                    });
+                }
+            } catch (e) {
+                console.warn("Could not load fo_symbols.txt");
             }
+        }
+
+        // 2. चुनी गई तारीख की Bhavcopy CSV फाइल लोड करें
+        async function loadDataForDate(dateStr) {
+            const cleanDate = dateStr.replace(/-/g, '');
+            const csvPath = `nse_bhavcopies/sec_bhavdata_${cleanDate}.csv`;
 
             try {
-                // सभी 5 दिनों की CSV फाइलों को एक साथ फेच करें
-                const fetchPromises = dateList.map(async (dt) => {
-                    try {
-                        const res = await fetch(`nse_bhavcopies/sec_bhavdata_${dt}.csv`);
-                        if (!res.ok) return null;
-                        const text = await res.text();
-                        return { date: dt, text: text };
-                    } catch (e) {
-                        return null;
-                    }
-                });
-
-                const results = await Promise.all(fetchPromises);
-                const validFiles = results.filter(item => item !== null);
-
-                if (validFiles.length === 0) {
-                    throw new Error("No files found");
-                }
-
-                processMultiDayData(validFiles, targetClean, dateStr);
-
-            } catch (error) {
-                console.warn("Error loading files:", error);
-                renderEmptyTable(dateStr);
+                const res = await fetch(csvPath);
+                if (!res.ok) throw new Error("File not found");
+                const csvText = await res.text();
+                parseAndRender(csvText, dateStr);
+            } catch (err) {
+                renderMessage(`तारीख ${dateStr} के लिए कोई डेटा उपलब्ध नहीं है।`);
             }
         }
 
-        function processMultiDayData(files, targetClean, dateStr) {
-            // हर सिंबल के लिए पिछले दिनों की Delivery Qty स्टोर करने का मैप
-            const stockHistory = {};
+        // 3. CSV पार्स करके F&O स्टॉक्स दिखाना
+        function parseAndRender(csvText, dateStr) {
+            const lines = csvText.split('\n');
+            const rows = [];
 
-            files.forEach(fileObj => {
-                const lines = fileObj.text.split('\n');
-                for (let i = 1; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (!line) continue;
-                    const row = line.split(',').map(item => item.trim().replace(/^"|"$/g, ''));
-                    
-                    if (row.length > 12) {
-                        const symbol = row[0];
-                        const series = row[1];
-                        if (series === 'EQ') {
-                            const delivQty = parseFloat(row[12]) || 0; // DELIV_QTY कॉलम 12 पर है
-                            const changePct = parseFloat(row[8]) || 0;
-
-                            if (!stockHistory[symbol]) {
-                                stockHistory[symbol] = { deliveries: [], changePct: changePct };
-                            }
-                            // तारीख के हिसाब से स्टोर करें
-                            stockHistory[symbol].deliveries.push({ date: fileObj.date, qty: delivQty, change: changePct });
-                        }
-                    }
-                }
-            });
-
-            const parsedData = [];
-
-            // मुख्य तारीख (Target Date) का डेटा आधार मानकर रेश्यो कैलकुलेट करें
-            Object.keys(stockHistory).forEach(symbol => {
-                const item = stockHistory[symbol];
-                // टारगेट डेट का डेटा ढूंढें
-                const targetRecord = item.deliveries.find(d => d.date === targetClean);
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
                 
-                if (targetRecord) {
-                    const todayQty = targetRecord.qty;
-                    // पिछले दिनों की डिलीवरी Qty (टारगेट को छोड़कर या मिलाकर 5-day average)
-                    const pastQtys = item.deliveries.map(d => d.qty);
-                    
-                    if (pastQtys.length > 0) {
-                        const sum = pastQtys.reduce((a, b) => a + b, 0);
-                        const avg5d = sum / pastQtys.length; // 5-day average delivery qty
+                const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                if (cols.length > 13) {
+                    const symbol = cols[0];
+                    const series = cols[1];
 
-                        const ratio = avg5d > 0 ? ((todayQty / avg5d) * 100).toFixed(1) : 0;
+                    // केवल F&O लिस्ट वाले और EQ सीरीज के शेयर लें
+                    if (series === 'EQ' && (foSymbols.size === 0 || foSymbols.has(symbol))) {
+                        const delivQty = parseFloat(cols[12]) || 0;
+                        const delivPct = parseFloat(cols[13]) || 0;
 
-                        parsedData.push({
+                        rows.push({
                             symbol: symbol,
-                            date: dateStr,
-                            ratio: parseFloat(ratio),
-                            changePct: targetRecord.change
+                            delivQty: delivQty,
+                            delivPct: delivPct
                         });
                     }
                 }
-            });
-
-            renderTable(parsedData);
-        }
-
-        function renderEmptyTable(dateStr) {
-            if (dataTableInstance) {
-                dataTableInstance.destroy();
-            }
-            const fullBody = document.getElementById('fullDataBody');
-            fullBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">इस तारीख (${dateStr}) के लिए पर्याप्त डेटा उपलब्ध नहीं है।</td></tr>`;
-            dataTableInstance = $('#fullDataTable').DataTable({ paging: false, searching: false, info: false });
-        }
-
-        function renderTable(processed) {
-            processed.sort((a, b) => b.ratio - a.ratio);
-
-            if (dataTableInstance) {
-                dataTableInstance.destroy();
             }
 
-            const fullBody = document.getElementById('fullDataBody');
-            fullBody.innerHTML = "";
-            
-            if (processed.length === 0) {
-                fullBody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">कोई डेटा नहीं मिला।</td></tr>`;
+            // डिलीवरी प्रतिशत के हिसाब से डिसेंडिंग सॉर्ट करें
+            rows.sort((a, b) => b.delivPct - a.delivPct);
+
+            if (tableInstance) {
+                tableInstance.destroy();
+            }
+
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = "";
+
+            if (rows.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400">इस दिन कोई F&O डेटा नहीं मिला।</td></tr>`;
             } else {
-                processed.forEach(item => {
-                    const changeColor = item.changePct >= 0 ? 'text-emerald-400' : 'text-rose-400';
-                    const changeSign = item.changePct >= 0 ? '+' : '';
-                    fullBody.innerHTML += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
-                        <td class="font-semibold text-white">${item.symbol}</td>
-                        <td class="text-slate-300">${item.date}</td>
-                        <td class="font-bold text-cyan-400">${item.ratio}%</td>
-                        <td class="font-bold ${changeColor}">${changeSign}${item.changePct}%</td>
-                    </tr>`;
+                rows.forEach(r => {
+                    tbody.innerHTML += `
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
+                            <td class="font-semibold text-white">${r.symbol}</td>
+                            <td class="text-right text-slate-300">${r.delivQty.toLocaleString('en-IN')}</td>
+                            <td class="text-right font-bold text-cyan-400">${r.delivPct.toFixed(2)}%</td>
+                        </tr>
+                    `;
                 });
             }
 
-            dataTableInstance = $('#fullDataTable').DataTable({
+            tableInstance = $('#deliveryTable').DataTable({
                 paging: false,
-                searching: false,
+                searching: true,
                 info: false,
                 order: [[2, "desc"]]
             });
+            
+            // कस्टम सर्च इनपुट को DataTables से जोड़ें
+            $('#stock-search').on('keyup', function() {
+                tableInstance.search(this.value).draw();
+            });
         }
 
-        // डिफ़ॉल्ट तारीख 10 अक्टूबर 2024 सेट की गई है[span_0](start_span)[span_0](end_span)[span_1](start_span)[span_1](end_span)
-        const defaultDateStr = "2024-10-10";
-        document.getElementById('bhav-date').value = defaultDateStr;
-        loadBhavcopyData(defaultDateStr);
+        function renderMessage(msg) {
+            if (tableInstance) tableInstance.destroy();
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = `<tr><td colspan="3" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
+            tableInstance = $('#deliveryTable').DataTable({ paging: false, searching: false, info: false });
+        }
 
-        document.getElementById('load-date-btn').addEventListener('click', function() {
-            const selectedDate = document.getElementById('bhav-date').value;
-            if (selectedDate) {
-                loadBhavcopyData(selectedDate);
-            }
+        // पेज लोड पर इनिशियलाइज़ेशन
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadFoSymbols();
+            
+            // डिफ़ॉल्ट रूप से आज की या हालिया तारीख सेट करें
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('bhav-date').value = "2024-10-10"; // आपकी उपलब्ध तारीख के अनुसार
+            loadDataForDate(document.getElementById('bhav-date').value);
         });
 
-        document.getElementById('search-stock-btn').addEventListener('click', function() {
-            const query = document.getElementById('stock-search-input').value.trim();
-            if (dataTableInstance) {
-                dataTableInstance.search(query).draw();
-            }
-        });
-
-        document.getElementById('stock-search-input').addEventListener('keyup', function(event) {
-            if (event.key === 'Enter') {
-                document.getElementById('search-stock-btn').click();
-            }
+        document.getElementById('load-btn').addEventListener('click', () => {
+            const dt = document.getElementById('bhav-date').value;
+            if (dt) loadDataForDate(dt);
         });
     </script>
 </body>
