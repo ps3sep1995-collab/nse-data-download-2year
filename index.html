@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NSE F&O 5-Day Delivery Dashboard</title>
+    <title>NSE F&O Delivery High/Low Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- DataTables CSS & JS -->
@@ -12,11 +12,12 @@
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <style>
         table.dataTable { width: 100% !important; margin: 0 !important; table-layout: fixed; }
-        th, td { padding: 8px 6px !important; font-size: 11px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        th:nth-child(1), td:nth-child(1) { width: 30%; text-align: left; }
-        th:nth-child(2), td:nth-child(2) { width: 25%; text-align: right; }
-        th:nth-child(3), td:nth-child(3) { width: 25%; text-align: right; }
-        th:nth-child(4), td:nth-child(4) { width: 20%; text-align: right; }
+        th, td { padding: 8px 4px !important; font-size: 10px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        th:nth-child(1), td:nth-child(1) { width: 25%; text-align: left; }
+        th:nth-child(2), td:nth-child(2) { width: 22%; text-align: right; }
+        th:nth-child(3), td:nth-child(3) { width: 20%; text-align: right; }
+        th:nth-child(4), td:nth-child(4) { width: 15%; text-align: right; }
+        th:nth-child(5), td:nth-child(5) { width: 18%; text-align: center; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans leading-relaxed">
@@ -25,8 +26,8 @@
         <!-- Header & Date Picker -->
         <header class="mb-3 border-b border-slate-800 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
-                <h1 class="text-sm font-bold tracking-tight text-emerald-400">NSE F&O 5-Day Delivery Dashboard</h1>
-                <p class="text-slate-400 text-[10px]">Delivery Qty vs 5-Day Average Ratio (%)</p>
+                <h1 class="text-sm font-bold tracking-tight text-emerald-400">NSE F&O Delivery High/Low Dashboard</h1>
+                <p class="text-slate-400 text-[10px]">Volume High & Low Trend Matrix</p>
             </div>
             
             <div class="flex items-center gap-1.5 bg-slate-800 px-2 py-1 rounded-lg border border-slate-700 shadow w-full sm:w-auto">
@@ -48,8 +49,9 @@
                     <tr>
                         <th class="text-left">Symbol</th>
                         <th class="text-right">Deliv Qty</th>
-                        <th class="text-right">5D Avg Qty</th>
+                        <th class="text-right">5D Avg</th>
                         <th class="text-right">Ratio %</th>
+                        <th class="text-center">Trend / Status</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -80,7 +82,7 @@
                     renderMessage("JSON फाइल खाली है।");
                 }
             } catch (e) {
-                renderMessage("error: dashboard_data.json लोड नहीं हो पा रही है।");
+                renderMessage("error: dashboard_data.json लोड नहीं हो पा रही है। कृपया backtest.py रन करें।");
             }
         }
 
@@ -95,25 +97,41 @@
             tbody.innerHTML = "";
 
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">तारीख ${dateStr} के लिए कोई डेटा उपलब्ध नहीं है।</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">तारीख ${dateStr} के लिए कोई डेटा उपलब्ध नहीं है।</td></tr>`;
             } else {
                 rows.sort((a, b) => b.ratioPct - a.ratioPct);
 
                 rows.forEach(r => {
+                    // Highs के लिए हरे/सुनहरे रंग, Lows के लिए लाल रंग के बैज
+                    let badgeClass = "text-slate-400 bg-slate-800";
+                    if (r.breakout === '1M High') {
+                        badgeClass = "text-amber-300 bg-amber-950/70 border border-amber-600/50 font-bold px-1.5 py-0.5 rounded";
+                    } else if (r.breakout === '2W High') {
+                        badgeClass = "text-purple-300 bg-purple-950/70 border border-purple-600/50 font-bold px-1.5 py-0.5 rounded";
+                    } else if (r.breakout === '1W High') {
+                        badgeClass = "text-emerald-300 bg-emerald-950/70 border border-emerald-600/50 font-bold px-1.5 py-0.5 rounded";
+                    } else if (r.breakout === '1M Low') {
+                        badgeClass = "text-rose-300 bg-rose-950/70 border border-rose-600/50 font-bold px-1.5 py-0.5 rounded";
+                    } else if (r.breakout === '2W Low') {
+                        badgeClass = "text-pink-300 bg-pink-950/70 border border-pink-600/50 font-bold px-1.5 py-0.5 rounded";
+                    } else if (r.breakout === '1W Low') {
+                        badgeClass = "text-orange-300 bg-orange-950/70 border border-orange-600/50 font-bold px-1.5 py-0.5 rounded";
+                    }
+
                     tbody.innerHTML += `
                         <tr class="border-b border-slate-700/50 hover:bg-slate-700/30">
                             <td class="font-semibold text-white">${r.symbol}</td>
                             <td class="text-right text-slate-300">${r.delivQty.toLocaleString('en-IN')}</td>
                             <td class="text-right text-slate-400">${r.avg5Qty.toLocaleString('en-IN')}</td>
                             <td class="text-right font-bold text-cyan-400">${r.ratioPct.toFixed(2)}%</td>
+                            <td class="text-center"><span class="inline-block text-[9px] ${badgeClass}">${r.breakout}</span></td>
                         </tr>
                     `;
                 });
 
-                // searching: false कर दिया गया है ताकि DataTables का खुद का सर्च बॉक्स न आए
                 tableInstance = $('#deliveryTable').DataTable({
                     paging: false,
-                    searching: false, 
+                    searching: false,
                     info: false,
                     order: [[3, "desc"]]
                 });
@@ -125,7 +143,7 @@
                 $('#deliveryTable').DataTable().clear().destroy();
             }
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
         }
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -143,7 +161,6 @@
             }
         });
 
-        // हमारे कस्टम सर्च बार को DataTables से जोड़ना
         $('#stock-search').on('keyup', function() {
             if (tableInstance) {
                 tableInstance.columns(0).search(this.value).draw();
