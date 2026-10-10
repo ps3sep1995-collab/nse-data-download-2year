@@ -70,11 +70,16 @@
                 if (!res.ok) throw new Error("JSON file not found");
                 globalData = await res.json();
                 
-                // उपलब्ध तारीखों में से सबसे आखिरी तारीख सेट करें
+                // JSON में मौजूद सभी तारीखों को सॉर्ट करें ताकि सबसे नई (latest) तारीख मिल सके
                 let availableDates = Object.keys(globalData).sort();
+                
                 if (availableDates.length > 0) {
-                    let latestDate = availableDates[availableDates.length - 1];
+                    let latestDate = availableDates[availableDates.length - 1]; // सबसे आखिरी/नवीनतम तारीख
+                    
+                    // Date picker में भी वही लेटेस्ट तारीख सेट करें
                     document.getElementById('bhav-date').value = latestDate;
+                    
+                    // टेबल में डेटा रेंडर करें
                     renderTableForDate(latestDate);
                 } else {
                     renderMessage("डेटा उपलब्ध नहीं है।");
@@ -95,9 +100,9 @@
             tbody.innerHTML = "";
 
             if (rows.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">इस तारीख (या छुट्टी के दिन) के लिए कोई डेटा उपलब्ध नहीं है।</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">तारीख ${dateStr} के लिए कोई डेटा उपलब्ध नहीं है।</td></tr>`;
             } else {
-                // Ratio % के हिसाब से सॉर्ट करें
+                // Ratio % के हिसाब से डिसेंडिंग सॉर्ट करें
                 rows.sort((a, b) => b.ratioPct - a.ratioPct);
 
                 rows.forEach(r => {
@@ -125,7 +130,7 @@
                 $('#deliveryTable').DataTable().clear().destroy();
             }
             const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">${msg}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-slate-400">${msg};
         }
 
         window.addEventListener('DOMContentLoaded', () => {
@@ -134,10 +139,12 @@
 
         document.getElementById('load-btn').addEventListener('click', () => {
             const dt = document.getElementById('bhav-date').value;
-            if (dt && globalData[dt]) {
-                renderTableForDate(dt);
-            } else {
-                renderMessage(`तारीख ${dt} के लिए कोई डेटा नहीं मिला (यह शेयर बाजार की छुट्टी हो सकती है)।`);
+            if (dt) {
+                if (globalData[dt]) {
+                    renderTableForDate(dt);
+                } else {
+                    renderMessage(`तारीख ${dt} के लिए कोई डेटा नहीं मिला (यह शेयर बाजार की छुट्टी हो सकती है)।`);
+                }
             }
         });
 
