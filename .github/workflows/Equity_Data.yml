@@ -2,13 +2,15 @@ name: Auto Download Equity_Data_Download
 
 on:
   schedule:
-    # अब यह हर दिन (सोमवार से रविवार) शाम को 6:30 बजे (IST) ऑटोमैटिक रन होगा
+    # यह हर दिन (सोमवार से रविवार) शाम को 6:30 बजे (IST) ऑटोमैटिक रन होगा
     - cron: '30 13 * * *'
   workflow_dispatch: # इससे आप चाहें तो कभी भी मैन्युअली भी रन कर सकते हैं
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
@@ -29,7 +31,6 @@ jobs:
 
     - name: Commit and push changes back to repo
       uses: stefanzweifel/git-auto-commit-action@v4
+      with:
         branch: main
         create_branch_for_ci_updates: false
-    permissions:
-      contents: write
