@@ -24,9 +24,9 @@ def download_and_clean_nse_data():
         print("NSE Connection Init Error:", e)
         return
 
-    # पिछले 10 दिनों की अवधि सेट की गई है (आप इसे अपने हिसाब से बदल सकते हैं)
+    # पिछले 3500 दिनों की अवधि सेट की गई है
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=3500)
+    start_date = end_date - timedelta(days=750)
     
     current_date = start_date
     os.makedirs("Equity", exist_ok=True)
@@ -37,11 +37,10 @@ def download_and_clean_nse_data():
     downloaded_count = 0
     duplicate_count = 0
 
-    # वांछित कॉलम जो हमें फाईल में रखने हैं
+    # केवल ये 8 कॉलम ही फाईल में रखे जाएंगे (हेडर के बिना)
     target_columns = [
         'SYMBOL', 'DATE1', 'OPEN_PRICE', 'HIGH_PRICE', 
-        'LOW_PRICE', 'CLOSE_PRICE', 'TTL_TRD_QNTY', 
-        'NO_OF_TRADES', 'DELIV_QTY', 'DELIV_PER'
+        'LOW_PRICE', 'CLOSE_PRICE', 'TTL_TRD_QNTY', 'DELIV_QTY'
     ]
 
     # डेटा डाउनलोड और कॉलम फिल्टरिंग
@@ -64,7 +63,7 @@ def download_and_clean_nse_data():
                     # कॉलम के नाम से अतिरिक्त स्पेस (Extra spaces) हटाने के लिए
                     df.columns = df.columns.str.strip()
                     
-                    # 🔴 केवल 'EQ' (Equity) सीरीज का डेटा रखने के लिए फिल्टर
+                    # केवल 'EQ' (Equity) सीरीज का डेटा रखने के लिए फिल्टर
                     if 'SERIES' in df.columns:
                         df = df[df['SERIES'].str.strip() == 'EQ']
                     
@@ -77,8 +76,8 @@ def download_and_clean_nse_data():
                         if 'DATE1' in df_filtered.columns:
                             df_filtered['DATE1'] = pd.to_datetime(df_filtered['DATE1']).dt.strftime('%Y%m%d')
                         
-                        # फ़िल्टर किए गए डेटा को टेक्स्ट फॉर्मेट में बदलना
-                        processed_content = df_filtered.to_csv(index=False).encode('utf-8')
+                        # header=False का उपयोग किया गया है ताकि फाइल में कॉलम के नाम (Header) न आएं
+                        processed_content = df_filtered.to_csv(index=False, header=False).encode('utf-8')
                         
                         # डाउनलोड करते ही मेमोरी में हैश निकालें
                         file_hash = hashlib.md5(processed_content).hexdigest()
@@ -88,7 +87,7 @@ def download_and_clean_nse_data():
                             print(f"डुप्लीकेट हटाई गई: EQ_{date_str_file}.txt (मूल फाइल: {seen_hashes[file_hash]})")
                             duplicate_count += 1
                         else:
-                            # 'Equity' फोल्डर में फ़िल्टर किया हुआ डेटा सेव करें
+                            # 'Equity' फोल्डर में बिना हेडर के डेटा सेव करें
                             with open(file_path, 'wb') as f:
                                 f.write(processed_content)
                             seen_hashes[file_hash] = date_str_file
@@ -113,7 +112,7 @@ def download_and_clean_nse_data():
     print(f"\nप्रक्रिया पूरी हुई!")
     print(f"कुल नई फाइलें सेव हुईं: {downloaded_count}")
     print(f"कुल डुप्लीकेट फाइलें रोकी गईं: {duplicate_count}")
-    print("अब 'Equity' फोल्डर में केवल EQ सीरीज का शुद्ध डेटा मौजूद है।")
+    print("अब 'Equity' फोल्डर में बिना हेडर के केवल 8 जरूरी कॉलम का डेटा मौजूद है।")
 
 if __name__ == "__main__":
     download_and_clean_nse_data()
