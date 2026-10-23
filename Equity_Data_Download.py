@@ -26,7 +26,7 @@ def download_and_clean_nse_data():
 
     # पिछले 10 दिनों की अवधि सेट की गई है (आप इसे अपने हिसाब से बदल सकते हैं)
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=10)
+    start_date = end_date - timedelta(days=3500)
     
     current_date = start_date
     os.makedirs("Equity", exist_ok=True)
