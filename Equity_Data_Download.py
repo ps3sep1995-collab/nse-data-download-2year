@@ -5,6 +5,7 @@ import requests
 import hashlib
 import pandas as pd
 import io
+
 def download_and_clean_nse_data():
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -23,7 +24,7 @@ def download_and_clean_nse_data():
         print("NSE Connection Init Error:", e)
         return
 
-    # पिछले 10 दिनों की अवधि सेट की गई है (आप इसे बदल सकते हैं)
+    # पिछले 10 दिनों की अवधि सेट की गई है (आप इसे अपने हिसाब से बदल सकते हैं)
     end_date = datetime.now()
     start_date = end_date - timedelta(days=10)
     
@@ -57,11 +58,15 @@ def download_and_clean_nse_data():
                 response = session.get(url, timeout=10)
                 if response.status_code == 200 and len(response.content) > 1000:
                     
-                    # Pandas का उपयोग करके केवल जरूरी कॉलम निकाले जा रहे हैं
+                    # Pandas का उपयोग करके डेटा पढ़ा जा रहा है
                     df = pd.read_csv(io.BytesIO(response.content))
                     
                     # कॉलम के नाम से अतिरिक्त स्पेस (Extra spaces) हटाने के लिए
                     df.columns = df.columns.str.strip()
+                    
+                    # 🔴 केवल 'EQ' (Equity) सीरीज का डेटा रखने के लिए फिल्टर
+                    if 'SERIES' in df.columns:
+                        df = df[df['SERIES'].str.strip() == 'EQ']
                     
                     # चेक करें कि सभी आवश्यक कॉलम मौजूद हैं या नहीं
                     available_cols = [col for col in target_columns if col in df.columns]
@@ -72,7 +77,7 @@ def download_and_clean_nse_data():
                         if 'DATE1' in df_filtered.columns:
                             df_filtered['DATE1'] = pd.to_datetime(df_filtered['DATE1']).dt.strftime('%Y%m%d')
                         
-                        # फ़िल्टर किए गए डेटा को टेक्स्ट (CSV/Comma-separated) फॉर्मेट में बदलना
+                        # फ़िल्टर किए गए डेटा को टेक्स्ट फॉर्मेट में बदलना
                         processed_content = df_filtered.to_csv(index=False).encode('utf-8')
                         
                         # डाउनलोड करते ही मेमोरी में हैश निकालें
@@ -108,7 +113,7 @@ def download_and_clean_nse_data():
     print(f"\nप्रक्रिया पूरी हुई!")
     print(f"कुल नई फाइलें सेव हुईं: {downloaded_count}")
     print(f"कुल डुप्लीकेट फाइलें रोकी गईं: {duplicate_count}")
-    print("अब 'Equity' फोल्डर में सही फॉर्मेट के साथ डेटा मौजूद है।")
+    print("अब 'Equity' फोल्डर में केवल EQ सीरीज का शुद्ध डेटा मौजूद है।")
 
 if __name__ == "__main__":
     download_and_clean_nse_data()
